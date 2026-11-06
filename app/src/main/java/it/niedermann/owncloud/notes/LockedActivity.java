@@ -13,9 +13,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.util.TypedValue;
+import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 
-import androidx.activity.OnBackPressedCallback;
 import androidx.annotation.Nullable;
 import androidx.preference.PreferenceManager;
 
@@ -27,7 +29,7 @@ public abstract class LockedActivity extends BrandedActivity {
     private static final String TAG = LockedActivity.class.getSimpleName();
 
     private static final int REQUEST_CODE_UNLOCK = 100;
-
+    private View privacyCover;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -39,86 +41,104 @@ public abstract class LockedActivity extends BrandedActivity {
             getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
         }
 
-        if (isTaskRoot()) {
-            askToUnlock();
+        if (NotesApplication.isLocked()) {
+            showPrivacyCover();
         }
+    }
 
-        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
-            @Override
-            public void handleOnBackPressed() {
-                setEnabled(false);
-                getOnBackPressedDispatcher().onBackPressed();
-                NotesApplication.updateLastInteraction();
-            }
-        });
+    @Override
+    protected void onPause() {
+        super.onPause();
+        showPrivacyCover();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
 
-        if (!isTaskRoot()) {
-            askToUnlock();
+        if (!NotesApplication.isLocked()) {
+            hidePrivacyCover();
+            return;
         }
-    }
 
-    @Override
-    protected void onStop() {
-        super.onStop();
-        if (isTaskRoot()) {
-            NotesApplication.updateLastInteraction();
+        showPrivacyCover();
+        if (isFinishing()) {
+            return;
         }
-    }
 
-    @Override
-    public void startActivityForResult(Intent intent, int requestCode, @Nullable Bundle options) {
-        NotesApplication.updateLastInteraction();
-        super.startActivityForResult(intent, requestCode, options);
-    }
+        if (NotesApplication.isLockFlowActive()) {
+            return;
+        }
 
-    @Override
-    public void startActivityForResult(Intent intent, int requestCode) {
-        NotesApplication.updateLastInteraction();
-        super.startActivityForResult(intent, requestCode);
-    }
-
-    @Override
-    public void startActivity(Intent intent) {
-        NotesApplication.updateLastInteraction();
-        super.startActivity(intent);
-    }
-
-    @Override
-    public void startActivity(Intent intent, @Nullable Bundle options) {
-        NotesApplication.updateLastInteraction();
-        super.startActivity(intent, options);
+        askToUnlock();
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
-        if (requestCode == REQUEST_CODE_UNLOCK) {
-            if (resultCode == RESULT_OK) {
-                Log.v(TAG, "Successfully unlocked device");
-                NotesApplication.unlock();
-            } else {
-                Log.e(TAG, "Result code of unlocking was " + resultCode);
-                finish();
-            }
+        if (requestCode != REQUEST_CODE_UNLOCK) {
+            return;
+        }
+
+        NotesApplication.setLockFlowActive(false);
+
+        if (resultCode == RESULT_OK) {
+            Log.v(TAG, "Successfully unlocked device");
+            NotesApplication.unlock();
+            hidePrivacyCover();
+        } else {
+            Log.e(TAG, "Result code of unlocking was " + resultCode);
+            finish();
         }
     }
 
     private void askToUnlock() {
-        if (NotesApplication.isLocked()) {
-            final var keyguardManager = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
-            if (keyguardManager != null) {
-                final var intent = keyguardManager.createConfirmDeviceCredentialIntent(getString(R.string.unlock_notes), null);
-                intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                startActivityForResult(intent, REQUEST_CODE_UNLOCK);
-            } else {
-                Log.e(TAG, "Keyguard manager is null");
-            }
+        final KeyguardManager keyguardManager = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+        if (keyguardManager == null) {
+            Log.e(TAG, "Keyguard manager is null");
+            continueUnlocked();
+            return;
         }
+
+        final Intent intent = keyguardManager.createConfirmDeviceCredentialIntent(getString(R.string.unlock_notes), null);
+        if (intent == null) {
+            Log.e(TAG, "Keyguard intent is null");
+            continueUnlocked();
+            return;
+        }
+
+        intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        NotesApplication.setLockFlowActive(true);
+        startActivityForResult(intent, REQUEST_CODE_UNLOCK);
+    }
+
+    private void continueUnlocked() {
+        NotesApplication.unlock();
+        hidePrivacyCover();
+    }
+
+    private void showPrivacyCover() {
+        if (privacyCover != null) {
+            return;
+        }
+
+        final TypedValue backgroundColor = new TypedValue();
+        getTheme().resolveAttribute(android.R.attr.colorBackground, backgroundColor, true);
+
+        privacyCover = new View(this);
+        privacyCover.setBackgroundColor(backgroundColor.data);
+        privacyCover.setClickable(true);
+        ((ViewGroup) getWindow().getDecorView()).addView(privacyCover,
+                new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    private void hidePrivacyCover() {
+        if (privacyCover == null) {
+            return;
+        }
+
+        ((ViewGroup) getWindow().getDecorView()).removeView(privacyCover);
+        privacyCover = null;
     }
 }

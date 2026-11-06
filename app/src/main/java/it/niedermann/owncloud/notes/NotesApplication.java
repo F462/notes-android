@@ -30,10 +30,9 @@ import it.niedermann.owncloud.notes.preferences.DarkModeSetting;
 public class NotesApplication extends Application {
     private static final String TAG = NotesApplication.class.getSimpleName();
 
-    private static final long LOCK_TIME = 30_000;
     private static boolean lockedPreference = false;
     private static boolean isLocked = true;
-    private static long lastInteraction = 0;
+    private static boolean isLockFlowActive = false;
     private static String PREF_KEY_THEME;
     private static boolean isGridViewEnabled = false;
     private static boolean isSwipeEnabled = true;
@@ -53,6 +52,7 @@ public class NotesApplication extends Application {
             WebView.setWebContentsDebuggingEnabled(true);
         }
         registerFilesAppType();
+        registerActivityLifecycleCallbacks(new ActivityLockObserver());
     }
 
     private void registerFilesAppType() {
@@ -112,9 +112,6 @@ public class NotesApplication extends Application {
     }
 
     public static boolean isLocked() {
-        if (!isLocked && System.currentTimeMillis() > (LOCK_TIME + lastInteraction)) {
-            isLocked = true;
-        }
         return lockedPreference && isLocked;
     }
 
@@ -122,7 +119,16 @@ public class NotesApplication extends Application {
         isLocked = false;
     }
 
-    public static void updateLastInteraction() {
-        lastInteraction = System.currentTimeMillis();
+    public static void relock() {
+        isLocked = true;
+        isLockFlowActive = false;
+    }
+
+    public static boolean isLockFlowActive() {
+        return isLockFlowActive;
+    }
+
+    public static void setLockFlowActive(boolean lockFlowActive) {
+        isLockFlowActive = lockFlowActive;
     }
 }

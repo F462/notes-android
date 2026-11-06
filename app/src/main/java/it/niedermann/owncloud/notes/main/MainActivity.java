@@ -46,7 +46,6 @@ import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
-import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.GravityCompat;
 import androidx.lifecycle.Observer;
 import androidx.lifecycle.ViewModelProvider;
@@ -164,8 +163,6 @@ public class MainActivity extends LockedActivity implements NoteClickListener, A
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        SplashScreen.installSplashScreen(this);
-
         super.onCreate(savedInstanceState);
 
         mainViewModel = new ViewModelProvider(this).get(MainViewModel.class);
