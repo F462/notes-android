@@ -115,6 +115,10 @@ public class NotesApplication extends Application {
         return lockedPreference && isLocked;
     }
 
+    public static boolean isLockEnabled() {
+        return lockedPreference;
+    }
+
     public static void unlock() {
         isLocked = false;
     }

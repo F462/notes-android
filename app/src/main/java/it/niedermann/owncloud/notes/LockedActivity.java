@@ -36,10 +36,7 @@ public abstract class LockedActivity extends BrandedActivity {
         super.onCreate(savedInstanceState);
 
         Thread.currentThread().setUncaughtExceptionHandler(new ExceptionHandler(this));
-
-        if (PreferenceManager.getDefaultSharedPreferences(this).getBoolean(getString(R.string.pref_key_prevent_screen_capture), false)) {
-            getWindow().setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
-        }
+        updateSecureFlag();
 
         if (NotesApplication.isLocked()) {
             showPrivacyCover();
@@ -49,12 +46,16 @@ public abstract class LockedActivity extends BrandedActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        showPrivacyCover();
+        updateSecureFlag();
+        if (NotesApplication.isLockEnabled()) {
+            showPrivacyCover();
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        updateSecureFlag();
 
         if (!NotesApplication.isLocked()) {
             hidePrivacyCover();
@@ -71,6 +72,16 @@ public abstract class LockedActivity extends BrandedActivity {
         }
 
         askToUnlock();
+    }
+
+    private void updateSecureFlag() {
+        final var prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        final boolean preventScreenCapture = prefs.getBoolean(getString(R.string.pref_key_prevent_screen_capture), false);
+        if (NotesApplication.isLockEnabled() || preventScreenCapture) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        } else {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        }
     }
 
     @Override
